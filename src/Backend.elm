@@ -66,12 +66,3 @@ broadcast clients msg =
 sendToFrontend : ClientId -> ToFrontend -> Cmd BackendMsg
 sendToFrontend clientId msg =
     Lamdera.Backend.sendToFrontend 1000 clientId (\_ -> Noop) msg
-
-
-
--- sendToFrontend :
---     Milliseconds
---     -> ClientId
---     -> (Result WsError () -> backendMsg)
---     -> toFrontend
---     -> Cmd backendMsg

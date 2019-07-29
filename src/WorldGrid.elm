@@ -216,7 +216,3 @@ neighborIndices ( x, y ) =
     , ( x + 1, y )
     , ( x + 1, y + 1 )
     ]
-
-
-
--- |> List.map (\(k, state) -> ((CellGrid.matrixIndex ( nRows, nCols ) k), state)

@@ -414,17 +414,6 @@ startupMessage2 =
    """
 
 
-
--- gamePalette : Model -> Element FrontendMsg
--- gamePalette model =
---     column [ spacing 24, alignTop ]
---         [
---         , model.world
---             |> World.view model.stagedWorldChange
---             |> Element.map StageResource
---         ]
-
-
 disasterProbabilityView : Model -> Element FrontendMsg
 disasterProbabilityView model =
     let
