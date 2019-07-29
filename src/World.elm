@@ -10,9 +10,19 @@ module World exposing
     , view
     )
 
+import Element exposing (..)
+import Element.Background as Background
+import Element.Border as Border
+import Element.Font as Font
+import Element.Input as Input
 import Html exposing (..)
 import Html.Attributes
 import Html.Events
+import Style
+
+
+
+-- import Msg exposing (FrontendMsg)
 
 
 type alias World =
@@ -90,37 +100,45 @@ scoreForWorldChange worldChange =
     }
 
 
-view : WorldChange -> World -> Html Resource
+view : WorldChange -> World -> Element Resource
 view stagedWorldChange world =
-    Html.div []
+    column [ spacing 36 ]
         [ scoreView (score world)
-        , resourceView Nature stagedWorldChange world
-        , resourceView Crop stagedWorldChange world
-        , resourceView City stagedWorldChange world
+        , column
+            []
+            [ resourceView Nature stagedWorldChange world
+            , resourceView Crop stagedWorldChange world
+            , resourceView City stagedWorldChange world
+            ]
         ]
 
 
-resourceView : Resource -> WorldChange -> World -> Html Resource
+resourceView : Resource -> WorldChange -> World -> Element Resource
 resourceView resourceMsg stagedWorldChange world =
-    Html.div []
-        [ -- emojiFromResource resourceMsg
-          " "
-            ++ String.fromInt (aggregate world |> getGetter resourceMsg)
-            ++ " ("
-            ++ String.fromInt
-                (stagedWorldChange
-                    |> getGetter resourceMsg
-                )
-            ++ ") "
-            ++ laborForResource resourceMsg
-            |> Html.text
-        , Html.button
-            [ Html.Events.onClick resourceMsg
-            , Html.Attributes.style "font-size" "40px"
-            , Html.Attributes.disabled (not (resourceAvailable resourceMsg stagedWorldChange world))
-            ]
-            [ text <| emojiFromResource resourceMsg
-            ]
+    row [ Font.size 48, spacing 12, Element.htmlAttribute (Html.Attributes.disabled (not (resourceAvailable resourceMsg stagedWorldChange world))) ]
+        [ el [ width (px 48) ] <| Element.text (String.fromInt (aggregate world |> getGetter resourceMsg))
+        , el [ width (px 48) ] <| Element.text (String.fromInt (stagedWorldChange |> getGetter resourceMsg))
+        , case resourceAvailable resourceMsg stagedWorldChange world of
+            True ->
+                Input.button
+                    []
+                    { onPress = Just resourceMsg
+                    , label =
+                        el []
+                            (Element.text <| emojiFromResource resourceMsg)
+                    }
+
+            False ->
+                Input.button
+                    []
+                    { onPress = Nothing
+                    , label =
+                        el [ Border.color Style.gray, Border.width 8, Font.size 24 ]
+                            (Element.text <| emojiFromResource resourceMsg)
+                    }
+
+        -- ++ laborForResource resourceMsg
+        -- |> Element.text
         ]
 
 
@@ -254,26 +272,26 @@ aggregatorThing worldChange changeSoFar =
     }
 
 
-scoreView : Score -> Html msg
-scoreView worldScore =
-    Html.div []
-        ([ ( "🍅"
-           , (worldScore.cropUse |> String.fromInt)
-                ++ "/"
-                ++ (worldScore.cropYield |> String.fromInt)
-           )
 
-         --, ( "👷\u{200D}♀️", worldScore.productivity |> String.fromInt )
-         , ( "🌬", worldScore.co2Offset |> String.fromInt )
-         ]
-            |> List.map
-                (\( key, value ) ->
-                    Html.div []
-                        [ Html.text
-                            (key
-                                ++ " "
-                                ++ value
-                            )
-                        ]
-                )
-        )
+-- scoreView : Score -> Element msg
+
+
+scoreView worldScore =
+    let
+        data : List ( String, String )
+        data =
+            [ ( "🍅"
+              , (worldScore.cropUse |> String.fromInt)
+                    ++ "/"
+                    ++ (worldScore.cropYield |> String.fromInt)
+              )
+
+            --, ( "👷\u{200D}♀️", worldScore.productivity |> String.fromInt )
+            , ( "🌬", worldScore.co2Offset |> String.fromInt )
+            ]
+
+        viewDatum : ( String, String ) -> Element msg
+        viewDatum =
+            \( key, value ) -> row [] [ Element.text (key ++ " " ++ value) ]
+    in
+    column [ Font.size 48 ] (List.map viewDatum data)

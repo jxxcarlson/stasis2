@@ -97,6 +97,9 @@ indicesOfCellsOfGivenState targetState (CellGrid ( nRows, nCols ) cells) =
         |> Array.toList
 
 
+{-| Change a fraction p of the grid cells which are in
+state = sourceState to state = targetState
+-}
 changeFractionOfGivenState : Float -> Float -> State -> State -> CellGrid State -> ( Int, CellGrid State )
 changeFractionOfGivenState seed p sourceState targetState ((CellGrid ( nRows, nCols ) cells) as grid) =
     let

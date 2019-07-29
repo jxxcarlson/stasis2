@@ -1,4 +1,4 @@
-module Utility exposing (chooseRandomSubList, getListElement, roundTo, uniquefyList)
+module Utility exposing (chooseRandomSubList, getListElement, maxFloat, minFloat, roundTo, uniquefyList)
 
 
 getListElement : Int -> List a -> Maybe a
@@ -21,6 +21,10 @@ uniquefyList list =
             []
 
 
+{-| Choose a random fraction p of the input list.
+For now, that fraction is taken from the front of the
+list.
+-}
 chooseRandomSubList : Float -> Float -> List a -> List a
 chooseRandomSubList seed p list =
     let
@@ -40,3 +44,13 @@ roundTo places x =
             10 ^ places |> toFloat
     in
     toFloat (round (f * x)) / f
+
+
+minFloat : List Float -> Maybe Float
+minFloat xs =
+    List.sort xs |> List.head
+
+
+maxFloat : List Float -> Maybe Float
+maxFloat xs =
+    List.sort xs |> List.reverse |> List.head

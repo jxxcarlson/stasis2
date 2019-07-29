@@ -8,6 +8,7 @@ type FrontendMsg
     = Increment
     | Decrement
     | FNoop
+    | Reset
     | ChangeTheWorld
     | StageResource World.Resource
     | CellGrid CellGrid.Render.Msg

@@ -4,9 +4,15 @@ module Frontend exposing (Model, app)
 -- import CellGrid.Render exposing (CellRenderer)
 
 import Array
+import Browser.Dom
 import CellGrid exposing (CellGrid)
 import CellGrid.Render exposing (CellRenderer)
 import Color
+import Element exposing (..)
+import Element.Background as Background
+import Element.Border as Border
+import Element.Font as Font
+import Element.Input as Input
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -15,6 +21,7 @@ import Lamdera.Frontend
 import Lamdera.Types exposing (Milliseconds, WsError)
 import Msg exposing (FrontendMsg(..), ToBackend(..), ToFrontend(..))
 import Random
+import Style
 import Utility
 import World exposing (Resource(..), World, WorldChange)
 import WorldGrid exposing (State(..))
@@ -42,6 +49,12 @@ app =
         }
 
 
+
+--
+-- MODEL
+--
+
+
 type alias Model =
     { counter : Int
     , stagedWorldChange : WorldChange
@@ -56,44 +69,43 @@ type alias Model =
 
 init : ( Model, Cmd FrontendMsg )
 init =
-    ( { counter = 0
-      , stagedWorldChange =
-            { cities = 0
-            , crops = 0
-            , nature = 0
-            }
-      , world =
-            World.init
-      , cellGrid =
-            WorldGrid.emptyGrid gridWidth gridWidth
-                |> WorldGrid.setRandomCell 0.2 (Occupied City)
-                |> WorldGrid.setRandomCell 0.8 (Occupied Crop)
-      , selectedState = Occupied Crop
-      , randomFloat = 0.0
-      , message = "Game starting.  Try to make CO2 offsets larger (now at -2)."
-      , message2 = ""
-      }
+    ( initialModel
     , sendToBackend ClientJoin
     )
 
 
+initialModel : Model
+initialModel =
+    { counter = 0
+    , stagedWorldChange =
+        { cities = 0
+        , crops = 0
+        , nature = 0
+        }
+    , world =
+        World.init
+    , cellGrid =
+        WorldGrid.emptyGrid gridWidth gridWidth
+            |> WorldGrid.setRandomCell 0.2 (Occupied City)
+            |> WorldGrid.setRandomCell 0.8 (Occupied Crop)
+    , selectedState = Occupied Crop
+    , randomFloat = 0.0
+    , message = ""
+    , message2 = ""
+    }
+
+
 view : Model -> Html FrontendMsg
 view model =
-    viewGame model
-
-
-
--- Html.div [ Html.Attributes.style "padding" "30px" ]
---     [ Html.button [ onClick Increment ] [ text "+" ]
---     , Html.text (String.fromInt model.counter)
---     , Html.button [ onClick Decrement ] [ text "-" ]
---     , viewGame model
---     ]
+    Element.layout [] (viewGame model)
 
 
 update : FrontendMsg -> Model -> ( Model, Cmd FrontendMsg )
 update msg model =
     case msg of
+        Reset ->
+            ( initialModel, Cmd.none )
+
         Increment ->
             ( { model | counter = model.counter + 1 }, sendToBackend CounterIncremented )
 
@@ -224,8 +236,11 @@ update msg model =
                 fractionalExcessCites =
                     toFloat excessCities / toFloat numberOfCities
 
+                fe =
+                    Utility.maxFloat [ fractionalExcessCites, 0.15 ] |> Maybe.withDefault 0.1
+
                 ( deltaCities, newCellGrid2 ) =
-                    WorldGrid.changeFractionOfGivenState p fractionalExcessCites (Occupied City) Unoccupied newCellGrid
+                    WorldGrid.changeFractionOfGivenState p fe (Occupied City) Unoccupied newCellGrid
 
                 stagedResource =
                     model.stagedWorldChange
@@ -291,7 +306,7 @@ gridDisplayWidth =
 
 
 gridWidth =
-    16
+    20
 
 
 fundsAvailable : Model -> Int
@@ -345,50 +360,72 @@ subscriptions model =
     Sub.none
 
 
-viewGame : Model -> Html FrontendMsg
+viewGame : Model -> Element FrontendMsg
 viewGame model =
-    div
-        [ Html.Attributes.style "font-size" "40px"
-        ]
-        [ div [ Html.Attributes.style "float" "left" ]
-            [ renderGrid model
-            , div [ Html.Attributes.style "float" "left" ] [ palette model ]
+    column [ padding 30, spacing 18 ]
+        [ row [ spacing 20 ]
+            [ column [ spacing 8 ]
+                [ renderGrid model |> Element.html
+                , palette model
+                ]
+            , column [ spacing 25, alignTop ]
+                [ turnView model.world
+                , model.world
+                    |> World.view model.stagedWorldChange
+                    |> Element.map StageResource
+                , changeTheWorldButton model
+
+                -- , el [ Font.size 24 ] (Element.text <| fundsAvailableMessage model)
+                , el [] (Element.text <| model.message2)
+                , el [ Font.size 18, Font.color Style.red ]
+                    (Element.text <| model.message)
+
+                -- , disasterProbabilityView model
+                ]
             ]
-        , div [ Html.Attributes.style "float" "left", Html.Attributes.style "margin-left" "20px" ]
-            [ turnView model.world
-            , model.world
-                |> World.view model.stagedWorldChange
-                |> Html.map StageResource
-            , Html.button
-                [ Html.Events.onClick ChangeTheWorld
-                , Html.Attributes.style "font-size" "40px"
-                , Html.Attributes.style "margin-top" "10px"
+        , el [ Font.size 18 ]
+            (Element.paragraph []
+                [ Element.text startupMessage1
+                , Element.text startupMessage2
                 ]
-                [ text "Change the World! 🌏 🙌" ]
-            , div
-                [ style "font-size" "24px"
-                , Html.Attributes.style "margin-top" "20px"
-                , style "width" "200px"
-                , style "word-wrap" "break-word"
-                ]
-                [ text <| fundsAvailableMessage model ]
-            , div
-                [ Html.Attributes.style "font-size" "24px"
-                , Html.Attributes.style "margin-top" "20px"
-                ]
-                [ text <| model.message ]
-            , div
-                [ Html.Attributes.style "font-size" "24px"
-                , Html.Attributes.style "margin-top" "20px"
-                , Html.Attributes.style "color" "red"
-                ]
-                [ text <| model.message2 ]
-            , disasterProbabilityView model
-            ]
+            )
         ]
 
 
-disasterProbabilityView : Model -> Html FrontendMsg
+startupMessage1 =
+    """Try to make CO2 offsets larger (you start at -2).
+      Trees (Nature) create CO2 offsets.  Cities and crop
+      land produce CO2.
+      Each city needs one unit of crop land to sustain
+      its population.
+        Prices of resources: city = 3, crop land = 2, forest land = 1. """
+
+
+startupMessage2 =
+    """
+   Buy resources (crop, city, etc) using the buttons on the
+   right of the screen.  Each city produces three units of
+    "money" in each period of play.  You may also buy resources
+   by clicking on the grid. For this you must select
+   the resource using the buttons at the bottom of the screen.
+   From time to time natural disasters occur, wiping out cities
+   and crop land.  The greater the level of CO2 offsets, the less
+   likely are these natural disasters.
+   """
+
+
+
+-- gamePalette : Model -> Element FrontendMsg
+-- gamePalette model =
+--     column [ spacing 24, alignTop ]
+--         [
+--         , model.world
+--             |> World.view model.stagedWorldChange
+--             |> Element.map StageResource
+--         ]
+
+
+disasterProbabilityView : Model -> Element FrontendMsg
 disasterProbabilityView model =
     let
         s =
@@ -401,22 +438,36 @@ disasterProbabilityView model =
         r =
             model.randomFloat |> Utility.roundTo 3
     in
-    div
-        [ Html.Attributes.style "font-size" "24px"
-        , Html.Attributes.style "margin-top" "20px"
-        ]
-        [ text <| "p = " ++ String.fromFloat p ++ ", r = " ++ String.fromFloat r ]
+    el [ Font.size 24 ]
+        (Element.text <| "p = " ++ String.fromFloat p ++ ", r = " ++ String.fromFloat r)
 
 
-turnView : World -> Html msg
+changeTheWorldButton model =
+    let
+        fa =
+            fundsAvailable model
+    in
+    case fa > 0 of
+        True ->
+            el [ Font.size 24 ] (Element.text <| "Allocate resources.  Funds available = " ++ String.fromInt fa)
+
+        False ->
+            Input.button [ Background.color Style.lightGreen, Font.size 36, Border.width 2, Border.rounded 8, padding 12, moveDown 4 ]
+                { onPress = Just ChangeTheWorld
+                , label = el [] (Element.text "Change the World! 🌏 🙌")
+                }
+
+
+resetButton =
+    Input.button [ moveUp 4, alignBottom, Background.color Style.lightGreen, Font.size 24, Border.width 2, Border.rounded 6, padding 8, moveDown 4 ]
+        { onPress = Just Reset
+        , label = el [] (Element.text "Start over")
+        }
+
+
+turnView : World -> Element FrontendMsg
 turnView world =
-    text ("Turn number: " ++ String.fromInt (List.length world))
-
-
-
---
--- Added by JC
---
+    el [ Font.size 36 ] (Element.text ("Turn: " ++ String.fromInt (List.length world)))
 
 
 renderGrid : Model -> Html FrontendMsg
@@ -429,36 +480,63 @@ renderGrid model =
         |> Html.map CellGrid
 
 
-palette : Model -> Html FrontendMsg
+palette : Model -> Element FrontendMsg
 palette model =
-    div []
-        [ div st [ paletteButton model City, text <| String.fromInt model.stagedWorldChange.cities ]
-        , div st [ paletteButton model Crop, text <| String.fromInt model.stagedWorldChange.crops ]
-        , div st [ paletteButton model Nature, text <| String.fromInt model.stagedWorldChange.nature ]
+    row [ centerX, paddingXY 0 8, spacing 18, Font.size 24 ]
+        [ paletteButton model City
+        , paletteButton model Crop
+        , paletteButton model Nature
+        , resetButton
         ]
 
 
-paletteButton : Model -> Resource -> Html FrontendMsg
+oldPalette : Model -> Element FrontendMsg
+oldPalette model =
+    column [ alignTop, paddingXY 18 0, spacing 18 ]
+        [ row Style.paletteItem [ paletteButton model City, Element.text <| String.fromInt model.stagedWorldChange.cities ]
+        , row Style.paletteItem [ paletteButton model Crop, Element.text <| String.fromInt model.stagedWorldChange.crops ]
+        , row Style.paletteItem [ paletteButton model Nature, Element.text <| String.fromInt model.stagedWorldChange.nature ]
+        ]
+
+
+paletteButton : Model -> Resource -> Element FrontendMsg
 paletteButton model resource =
     let
-        dimensions =
+        c =
             if model.selectedState == Occupied resource then
-                "70px"
+                Style.red
 
             else
-                "60px"
+                Style.black
+
+        bgc =
+            case resource of
+                City ->
+                    Style.blue
+
+                Crop ->
+                    Style.yellow
+
+                Nature ->
+                    Style.green
     in
-    Html.button
-        [ Html.Attributes.style "width" dimensions
-        , Html.Attributes.style "height" dimensions
-        , Html.Attributes.style "font-color" "white"
-        , Html.Attributes.style "background-color" (colorOfResource resource)
-        , Html.Attributes.style "margin-right" "10px"
-        , Html.Attributes.style "font-size" "30px"
-        , Html.Events.onClick (handlerOfResource resource)
-        , Html.Attributes.disabled (not (World.resourceAvailable resource model.stagedWorldChange model.world))
-        ]
-        [ text <| labelForResource resource ]
+    Input.button [ Border.width 5, Border.color c, Background.color bgc ]
+        { onPress = Just (handlerOfResource resource)
+        , label = el [ moveDown 5, padding 8 ] (Element.text <| labelForResource resource)
+        }
+
+
+
+-- [ Html.Attributes.style "width" dimensions
+-- , Html.Attributes.style "height" dimensions
+-- , Html.Attributes.style "font-color" "white"
+-- , Html.Attributes.style "background-color" (colorOfResource resource)
+-- , Html.Attributes.style "margin-right" "10px"
+-- , Html.Attributes.style "font-size" "30px"
+-- , Html.Events.onClick (handlerOfResource resource)
+-- , Html.Attributes.disabled (not (World.resourceAvailable resource model.stagedWorldChange model.world))
+-- ]
+-- [ text <| labelForResource resource ]
 
 
 st =
